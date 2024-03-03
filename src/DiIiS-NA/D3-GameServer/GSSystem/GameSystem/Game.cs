@@ -195,11 +195,9 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 		public int DestinationEnterQuestStep = -1;
 
 		/// <summary>
-		/// Current act system id.
+		/// Current act.
 		/// </summary>
-		public int CurrentAct = -1;
-
-		public ActEnum CurrentActEnum => CurrentAct != -1 ? (ActEnum)CurrentAct : ActEnum.Act1;
+		public ActEnum? CurrentAct { get; set; } = null;
 		private int _difficulty = 0;
 
 		/// <summary>
@@ -239,7 +237,7 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 		/// Current act SNO id.
 		/// </summary>
 		public int CurrentActSnoId =>
-			CurrentActEnum switch
+			CurrentAct switch
 			{
 				ActEnum.Act1 => 70015,
 				ActEnum.Act2 => 70016,
@@ -333,7 +331,7 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 		{
 			get
 			{
-				if (CurrentAct == 3000) return 0x0000ffff;
+				if (CurrentAct == ActEnum.OpenWorld) return 0x0000ffff;
 				int flags = 0;
 				for (int i = 16; i >= 0; i--)
 				{
@@ -346,7 +344,7 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 		}
 
 		public Vector3D StartPosition =>
-			CurrentActEnum switch
+			CurrentAct switch
 			{
 				ActEnum.Act1 => StartingWorld.GetStartingPointById(24).Position,
 				ActEnum.Act2 => StartingWorld.GetStartingPointById(59).Position,
@@ -392,7 +390,6 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 			InitialMonsterLevel = initalLevel;
 			MonsterLevel = initalLevel;
 			QuestManager = new QuestManager(this);
-			CurrentAct = -1;
 			QuestsOrder = null;
 			CurrentQuest = -1;
 			CurrentStep = -1;
@@ -700,11 +697,11 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 							SyncedData = new GameSyncedData
 							{
 								GameSyncedFlags = 6,
-								Act = CurrentAct, //act id
+								Act = (int)(CurrentAct ?? ActEnum.OpenWorld), //act id
 								InitialMonsterLevel = InitialMonsterLevel, //InitialMonsterLevel
 								MonsterLevel = 0x6FEA8DF5, //MonsterLevel
 								RandomWeatherSeed = 0, //RandomWeatherSeed
-								OpenWorldMode = CurrentAct == 3000 ? -1 : 0, //OpenWorldMode
+								OpenWorldMode = CurrentAct == ActEnum.OpenWorld ? -1 : 0, //OpenWorldMode
 								OpenWorldModeAct = -1, //OpenWorldModeAct
 								OpenWorldModeParam = -1, //OpenWorldModeParam
 								OpenWorldTransitionTime = 0, //OpenWorldTransitionTime
@@ -734,29 +731,29 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 									new long[] { 0x0, 0x0, 0x0, 0x0 }, //TiredRiftPaticipatingHeroID
 							}
 						});
-						if ((CurrentStep == -1 || CurrentAct == 400) && (CurrentQuest == QuestsOrder[0]) &&
-						    CurrentAct != 3000)
+						if ((CurrentStep == -1 || CurrentAct == ActEnum.Act5) && (CurrentQuest == QuestsOrder[0]) &&
+                            CurrentAct != ActEnum.OpenWorld)
 						{
 							switch (CurrentAct)
 							{
-								case 0:
+								case ActEnum.Act1:
 									joinedPlayer.EnterWorld(StartingWorld.GetStartingPointById(0).Position);
 									break;
-								case 100:
+								case ActEnum.Act2:
 									joinedPlayer.EnterWorld(StartingWorld.GetStartingPointById(130).Position);
 									break;
-								case 200:
+								case ActEnum.Act3:
 									joinedPlayer.ChangeWorld(GetWorld(WorldSno.a3dun_hub_adria_tower_intro),
 										GetWorld(WorldSno.a3dun_hub_adria_tower_intro).GetStartingPointById(206)
 											.Position);
 									break;
-								case 300:
+								case ActEnum.Act4:
 									joinedPlayer.ChangeWorld(
 										GetWorld(WorldSno.a4dun_heaven_1000_monsters_fight_entrance),
 										GetWorld(WorldSno.a4dun_heaven_1000_monsters_fight_entrance).StartingPoints
 											.First().Position);
 									break;
-								case 400:
+								case ActEnum.Act5:
 									joinedPlayer.ChangeWorld(GetWorld(WorldSno.x1_westmarch_overlook_d),
 										GetWorld(WorldSno.x1_westmarch_overlook_d).StartingPoints.First().Position);
 									break;
@@ -873,12 +870,12 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 					UpdateLevel();
 					joinedPlayer.NotifyMaintenance();
 
-					if (CurrentAct == 3000 && !joinedPlayer.InGameClient.OpenWorldDefined)
+					if (CurrentAct == ActEnum.OpenWorld && !joinedPlayer.InGameClient.OpenWorldDefined)
 					{
 						joinedPlayer.InGameClient.OpenWorldDefined = true;
 						joinedPlayer.InGameClient.SendMessage(new ActTransitionMessage
 						{
-							Act = 3000,
+							Act = (int)ActEnum.OpenWorld,
 							OnJoin = true
 						});
 
@@ -1014,7 +1011,7 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 				CurrentQuest = QuestsOrder[0];
 				CurrentStep = -1;
 
-				if (CurrentAct is 3000)
+				if (CurrentAct == ActEnum.OpenWorld)
 				{
 					QuestManager.Quests[CurrentQuest].Steps[-1].OnAdvance.Invoke();
 					return;
@@ -1053,11 +1050,11 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 			}
 		}
 
-		public void SetAct(int act)
+		public void SetAct(ActEnum act)
 		{
 			if (PvP)
 			{
-				CurrentAct = 0;
+				CurrentAct = ActEnum.Act1;
 				QuestsOrder = _questsOrderA1;
 				QuestProgress = new QuestRegistry(this);
 				StartingWorldSno = WorldSno.pvp_caout_arena_01;
@@ -1070,32 +1067,32 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 
 				switch (act)
 				{
-					case 0:
+					case ActEnum.Act1:
 						QuestsOrder = _questsOrderA1;
 						StartingWorldSno = WorldSno.trout_town;
 						QuestProgress = new ActI(this);
 						break;
-					case 100:
+					case ActEnum.Act2:
 						QuestsOrder = _questsOrderA2;
 						StartingWorldSno = WorldSno.caout_refugeecamp;
 						QuestProgress = new ActII(this);
 						break;
-					case 200:
+					case ActEnum.Act3:
 						QuestsOrder = _questsOrderA3;
 						StartingWorldSno = WorldSno.a3dun_hub_keep;
 						QuestProgress = new ActIII(this);
 						break;
-					case 300:
+					case ActEnum.Act4:
 						QuestsOrder = _questsOrderA4;
 						StartingWorldSno = WorldSno.a4dun_heaven_hub_keep;
 						QuestProgress = new ActIV(this);
 						break;
-					case 400:
+					case ActEnum.Act5:
 						QuestsOrder = _questsOrderA5;
 						StartingWorldSno = WorldSno.x1_westmarch_hub;
 						QuestProgress = new ActV(this);
 						break;
-					case 3000:
+					case ActEnum.OpenWorld:
 						QuestsOrder = _questsOrderOpenWorld;
 						StartingWorldSno = WorldSno.x1_tristram_adventure_mode_hub;
 						QuestProgress = new OpenWorld(this);
@@ -1110,7 +1107,7 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 			}
 		}
 
-		public void ChangeAct(int act)
+		public void ChangeAct(ActEnum act)
 		{
 			foreach (var plr in Players.Values)
 				plr.InGameClient.SendMessage(new SimpleMessage(Opcodes.LoadingWarping));
@@ -1123,12 +1120,12 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 			{
 				plr.Key.SendMessage(new ActTransitionMessage
 				{
-					Act = act,
+					Act = (int)act,
 					OnJoin = true, //with cutscenes
 				});
 
 				plr.Value.UpdateHeroState();
-				if (act == 3000)
+				if (act == ActEnum.OpenWorld)
 				{
 					plr.Key.SendMessage(new IntDataMessage(Opcodes.DungeonFinderSeedMessage)
 					{
@@ -1156,11 +1153,11 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 					SyncedData = new GameSyncedData
 					{
 						GameSyncedFlags = IsSeasoned ? IsHardcore ? 6 : 4 : IsHardcore == true ? 4 : 6,
-						Act = Math.Min(CurrentAct, 3000), //act id
+						Act = (int)(CurrentAct ?? ActEnum.OpenWorld), //act id
 						InitialMonsterLevel = InitialMonsterLevel, //InitialMonsterLevel
 						MonsterLevel = 0x7044248F, //MonsterLevel
 						RandomWeatherSeed = 0, //RandomWeatherSeed
-						OpenWorldMode = CurrentAct == 3000 ? -1 : 0, //OpenWorldMode
+						OpenWorldMode = CurrentAct == ActEnum.OpenWorld ? -1 : 0, //OpenWorldMode
 						OpenWorldModeAct = -1, //OpenWorldModeAct
 						OpenWorldModeParam = -1, //OpenWorldModeParam
 						OpenWorldTransitionTime = 200, //OpenWorldTransitionTime
@@ -1191,22 +1188,22 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 				});
 				switch (act)
 				{
-					case 0:
+					case ActEnum.Act1:
 						plr.Value.ChangeWorld(StartingWorld, StartingWorld.GetStartingPointById(0).Position);
 						break;
-					case 100:
+					case ActEnum.Act2:
 						plr.Value.ChangeWorld(StartingWorld, StartingWorld.GetStartingPointById(130).Position);
 						break;
-					case 200:
+					case ActEnum.Act3:
 						plr.Value.ChangeWorld(GetWorld(WorldSno.a3dun_hub_adria_tower_intro),
 							GetWorld(WorldSno.a3dun_hub_adria_tower_intro).GetStartingPointById(206).Position);
 						break;
-					case 300:
+					case ActEnum.Act4:
 						plr.Value.ChangeWorld(GetWorld(WorldSno.a4dun_heaven_1000_monsters_fight_entrance),
 							GetWorld(WorldSno.a4dun_heaven_1000_monsters_fight_entrance).StartingPoints.First()
 								.Position);
 						break;
-					case 400:
+					case ActEnum.Act5:
 						plr.Value.ChangeWorld(GetWorld(WorldSno.x1_westmarch_overlook_d),
 							GetWorld(WorldSno.x1_westmarch_overlook_d).StartingPoints.First().Position);
 						break;
@@ -1879,7 +1876,7 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 
 			World world;
 
-			if (CurrentAct != 3000 && worldSno == WorldSno.x1_tristram_adventure_mode_hub) //fix for a1 Tristram
+			if (CurrentAct != ActEnum.OpenWorld && worldSno == WorldSno.x1_tristram_adventure_mode_hub) //fix for a1 Tristram
 				worldSno = WorldSno.trout_town;
 
 			if (!WorldExists(worldSno)) // If it doesn't exist, try to load it
@@ -1928,7 +1925,7 @@ namespace DiIiS_NA.GameServer.GSSystem.GameSystem
 		public World GetWayPointWorldById(int id)
 		{
 			Logger.MethodTrace($"id {id}");
-			bool isOpenWorld = CurrentAct == 3000;
+			bool isOpenWorld = CurrentAct == ActEnum.OpenWorld;
 			ImmutableArray<WaypointInfo> actData;
 			if (isOpenWorld)
 				actData = ((Act)MPQStorage.Data.Assets[SNOGroup.Act][70015].Data).WayPointInfo
